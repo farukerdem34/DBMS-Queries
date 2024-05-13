@@ -24,3 +24,18 @@ BEGIN
 END
 
 SELECT dbo.maxBook_instock()
+
+
+CREATE FUNCTION gecerliEPosta(@adres VARCHAR(50))
+RETURNS bit
+BEGIN
+	DECLARE @atIndex INT, @comIndex INT, @mailCount INT, @sonuc bit
+	SELECT @sonuc=1
+	SELECT @atIndex=CHARINDEX('@',@adres)
+	IF (@atIndex=0) SELECT @sonuc=0
+	SELECT @comIndex=CHARINDEX('.com',@adres)
+	IF ((@comIndex=0) OR (@atIndex>@comIndex)) SELECT @sonuc=0
+	SELECT @mailCount=COUNT(*) FROM Kullanici WHERE @adres=email
+	IF (@mailCount!=0) SELECT @sonuc=0
+	RETURN @sonuc
+END
