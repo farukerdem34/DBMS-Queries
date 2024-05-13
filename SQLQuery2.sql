@@ -69,4 +69,14 @@ AS BEGIN
 	SELECT * FROM Kullanici ORDER BY id DESC
 END
 
+ALTER PROCEDURE ekleKullanici
+(@ad VARCHAR(50), @soyad VARCHAR(50), @email VARCHAR(50), @adres NTEXT, @telno CHAR(15), @password CHAR(10))
+AS BEGIN
+	SET NOCOUNT ON
+	INSERT INTO Kullanici(ad,soyad,email,adres,telno,password) VALUES(@ad,@soyad,@email,@adres,@telno,@password)
+END
+
+
 EXEC getirTumKullanicilar
+
+EXEC ekleKullanici @ad='Ömer',@soyad='ERDEM',@email='faruk.erdem@gmail.com',@adres='Istanbul',@telno='12345678912345',@password='omer123'
