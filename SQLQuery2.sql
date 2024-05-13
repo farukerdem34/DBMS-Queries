@@ -80,3 +80,23 @@ END
 EXEC getirTumKullanicilar
 
 EXEC ekleKullanici @ad='Ömer',@soyad='ERDEM',@email='faruk.erdem@gmail.com',@adres='Istanbul',@telno='12345678912345',@password='omer123'
+
+CREATE PROCEDURE indirim (@oran INT)
+AS BEGIN
+	UPDATE Kitaplar SET fiyat=fiyat-(fiyat*@oran/10);
+END
+
+CREATE PROCEDURE siprarisListele(@mintutar INT,@maxtutar INT)
+AS BEGIN
+	SET NOCOUNT ON;
+	SELECT * FROM Siparis WHERE tutar BETWEEN @mintutar AND @maxtutar;
+END
+
+ALTER PROCEDURE siprarisListele(@mintutar INT,@maxtutar INT)
+AS BEGIN
+	SET NOCOUNT ON;
+	SELECT * FROM Siparis WHERE tutar BETWEEN @mintutar AND @maxtutar;
+END
+
+
+EXEC siprarisListele 0,10000
