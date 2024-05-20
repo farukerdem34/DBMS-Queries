@@ -270,3 +270,10 @@ CREATE VIEW party_candidate AS SELECT voter_name,voter_surname,P_Name FROM Candi
 SELECT * FROM party_candidate
 -- Alter Table -> Add Total Vote to table
 ALTER VIEW party_candidate AS SELECT voter_name,voter_surname,P_Name,dbo.sum_party_votes(p.id) as 'Total Vote' FROM Candidate c JOIN Party p ON c.party_id=p.id JOIN Voter v ON c.voter_id=v.id
+
+-- Calculate the party how much candidate has
+SELECT COUNT(DISTINCT c.id) AS 'Unique Candidate Number',p.P_Name AS 'Party' FROM Candidate c JOIN Party p ON p.id=c.party_id GROUP BY c.id,p.P_Name
+
+--Order by total vote
+CREATE PROCEDURE order_by_total_vote AS SELECT * FROM party_candidate ORDER BY 4 DESC
+EXEC order_by_total_vote
