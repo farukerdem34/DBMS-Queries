@@ -5,7 +5,7 @@ USE electionv2
 
 CREATE TABLE Election(
 id INT PRIMARY KEY IDENTITY(1,1),
-election_date DATE NOT NULL
+election_date DATE NOT NULL,
 );
 
 CREATE TABLE Voter(
@@ -28,7 +28,7 @@ CREATE TABLE Candidate(
 id INT PRIMARY KEY IDENTITY(1,1),
 party_id INT FOREIGN KEY REFERENCES Party(id),
 election_id INT FOREIGN KEY REFERENCES Election(id)
-
+[state] BIT DEFAULT 1 NOT NULL
 );
 
 
@@ -150,3 +150,123 @@ DROP DATABASE third_assignment
 -- ALTER TABLE Ballotbox DROP COLUMN ballotBox_no
 
 -- END Drop statements
+
+-- Withdraw the candidates below the threshold from the selection by setting their state column equal to zero.
+
+-- Procedure
+CREATE PROCEDURE barajin_alti
+AS BEGIN
+	UPDATE Candidate 
+	SET [state] = 0
+	FROM Candidate c
+	-- Join
+	LEFT JOIN (
+	SELECT candidate_id, COUNT(*) AS total_vote
+	FROM Vote
+	-- Group By
+	GROUP BY candidate_id
+	) AS vote_count
+	ON candidate_id = vote_count.candidate_id
+WHERE vote_count.total_vote <= 1;
+END
+
+EXEC barajin_alti
+
+-- Get Winner
+-- Procedure
+CREATE PROCEDURE get_winner
+AS BEGIN
+	-- Top Statement
+	SELECT TOP 1 COUNT(candidate_id) as total_vote, candidate_id, v.voter_name FROM Vote JOIN Candidate AS c 
+	ON candidate_id=c.id 
+	-- Join
+	JOIN Voter as v ON v.id=c.voter_id
+	-- Group By
+	GROUP BY candidate_id,voter_name
+END
+
+EXEC get_winner
+
+-- To inhibit data lose delete statement banned from Candidate table in system wide by trigger.
+CREATE TRIGGER inhibit_delete on Candidate
+INSTEAD OF DELETE
+AS BEGIN
+	DECLARE @candidate_id INT;
+	SELECT @candidate_id=id FROM DELETED
+	UPDATE Candidate SET [state]=0 WHERE id=@candidate_id
+END
+
+
+-- DELETE and UPDATE statements are not possible due to security reasons.
+CREATE TRIGGER votes_cant_change ON Vote
+INSTEAD OF DELETE,UPDATE
+AS BEGIN
+PRINT('Votes cannot be changed anyway!')
+END
+
+-- Checks Voter data
+CREATE FUNCTION is_valid_voter(@citizenship_id VARCHAR(50),@election_id INT)
+RETURNS BIT
+AS BEGIN
+	DECLARE @Result INT;
+	SELECT @Result=1;
+	IF (LEN(@citizenship_id)!=11) SELECT @Result=0
+	IF (@election_id NOT IN (SELECT id FROM Election)) SELECT @Result=0
+	RETURN @Result
+END
+
+-- Insert Voter by procedure
+CREATE PROCEDURE insert_voter(@name VARCHAR(50),@surname VARCHAR(50),@sign VARCHAR(50),@citizenship_id VARCHAR(50),@election_id INT)
+AS BEGIN
+  DECLARE @Result BIT;
+      SELECT @Result = dbo.is_valid_voter(@citizenship_id, @election_id);
+      IF @Result = 1
+      BEGIN
+          INSERT INTO Voter(voter_name, voter_surname, sign_picture, citizenship_id, election_id) 
+		  VALUES(@name, @surname, @sign, @citizenship_id, @election_id);
+	END
+	ELSE
+	BEGIN
+	PRINT('Invalid voter data')
+	END
+END;
+
+-- Get total votes of areas between 1 and 15. First 15 areas is included to 1st territory
+SELECT area_name,COUNT(area_name) as total_vote FROM Vote AS v JOIN Ballotbox AS b ON v.ballotbox_id=b.id 
+JOIN Area as a ON b.area_id=a.id GROUP BY area_name,a.id HAVING a.id BETWEEN 1 and 15
+
+
+-- Calculate parties total vote
+CREATE FUNCTION sum_party_votes(@party_id int)
+RETURNS INT
+AS BEGIN
+DECLARE @Result INT;
+SELECT @Result=COUNT(candidate_id) FROM Vote v JOIN Candidate c ON c.id=v.candidate_id JOIN Voter voter ON voter.id=c.voter_id 
+JOIN Party p ON c.party_id=p.id
+GROUP BY candidate_id,voter_name,p.[P_Name],p.id HAVING p.id=@party_id 
+RETURN @Result
+END
+
+
+-- Sum of 2 parties vote
+CREATE FUNCTION sum_2_party_votes(@party2 int,@party1 int)
+RETURNS INT
+AS BEGIN
+DECLARE @Result INT
+DECLARE @party1_vote INT, @party2_vote INT
+SELECT @party1_vote=dbo.sum_party_votes(@party1)
+SELECT @party2_vote=dbo.sum_party_votes(@party2)
+SELECT @Result=SUM(@party1_vote+@party2_vote)
+RETURN @Result
+END
+
+-- Ballotbox-area join
+SELECT election_id,area_name FROM Ballotbox b JOIN Area a ON b.area_id=a.id
+-- Candidate
+SELECT * FROM Candidate c JOIN Party p ON c.party_id=p.id
+
+-- Create View
+CREATE VIEW party_candidate AS SELECT voter_name,voter_surname,P_Name FROM Candidate c JOIN Party p ON c.party_id=p.id JOIN Voter v ON c.voter_id=v.id
+SELECT * FROM party_candidate
+-- Alter Table -> Add Total Vote to table
+ALTER VIEW party_candidate AS SELECT voter_name,voter_surname,P_Name,dbo.sum_party_votes(p.id) as 'Total Vote' FROM Candidate c JOIN Party p ON c.party_id=p.id JOIN Voter v ON c.voter_id=v.id
